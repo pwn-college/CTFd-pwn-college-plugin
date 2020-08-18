@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block stylesheets %}
+    {{ super() }}
+    <link rel="stylesheet" href="plugins/pwncollege/assets/terminal/xterm.css" />
+{% endblock %}
+
+{% block content %}
+    <div id="terminal" style="margin: 10px;"></div>
+{% endblock %}
+
+{% block scripts %}
+    {{ super() }}
+    <script src="plugins/pwncollege/assets/terminal/xterm.js"></script>
+    <script src="plugins/pwncollege/assets/terminal/terminal.js"></script>
+{% endblock %}
