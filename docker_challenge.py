@@ -1,4 +1,5 @@
 import os
+import sys
 import tempfile
 import tarfile
 
@@ -22,7 +23,7 @@ from CTFd.utils.uploads import delete_file
 from CTFd.plugins.challenges import BaseChallenge
 from CTFd.plugins.flags import get_flag_class
 
-from .settings import INSTANCE
+from .settings import INSTANCE, HOST_DATA_PATH
 from .utils import user_flag, challenge_path
 
 
@@ -39,17 +40,17 @@ class DockerChallenge(BaseChallenge):
     id = "docker"  # Unique identifier used to register challenges
     name = "docker"  # Name of a challenge type
     templates = {  # Templates used for each aspect of challenge editing & viewing
-        "create": "/plugins/pwncollege/assets/docker_challenge/create.html",
-        "update": "/plugins/pwncollege/assets/docker_challenge/update.html",
-        "view": "/plugins/pwncollege/assets/docker_challenge/view.html",
+        "create": "/plugins/CTFd-pwn-college-plugin/assets/docker_challenge/create.html",
+        "update": "/plugins/CTFd-pwn-college-plugin/assets/docker_challenge/update.html",
+        "view": "/plugins/CTFd-pwn-college-plugin/assets/docker_challenge/view.html",
     }
     scripts = {  # Scripts that are loaded when a template is loaded
-        "create": "/plugins/pwncollege/assets/docker_challenge/create.js",
-        "update": "/plugins/pwncollege/assets/docker_challenge/update.js",
-        "view": "/plugins/pwncollege/assets/docker_challenge/view.js",
+        "create": "/plugins/CTFd-pwn-college-plugin/assets/docker_challenge/create.js",
+        "update": "/plugins/CTFd-pwn-college-plugin/assets/docker_challenge/update.js",
+        "view": "/plugins/CTFd-pwn-college-plugin/assets/docker_challenge/view.js",
     }
     # Route at which files are accessible. This must be registered using register_plugin_assets_directory()
-    route = "/plugins/pwncollege/assets/docker_challenge/"
+    route = "/plugins/CTFd-pwn-college-plugin/assets/docker_challenge/"
     # Blueprint used to access the static_folder directory.
     blueprint = Blueprint(
         "docker", __name__, template_folder="templates", static_folder="assets"
@@ -114,9 +115,7 @@ class RunDocker(Resource):
                 environment={"CHALLENGE_ID": str(challenge_id)},
                 mounts=[
                     docker.types.Mount(
-                        "/home/ctf",
-                        f"/opt/pwn-college/persistent/{INSTANCE}/data-nosuid/{user.id}",
-                        "bind",
+                        "/home/ctf", f"{HOST_DATA_PATH}/home-nosuid/{user.id}", "bind"
                     )
                 ],
                 network="none",
@@ -128,8 +127,11 @@ class RunDocker(Resource):
                 stdin_open=True,
                 remove=True,
             )
-        except Exception:
+        except Exception as e:
+            print(f"Docker failed: {e}", file=sys.stderr)
             return {"success": False, "error": "Docker failed"}
+
+        # TODO: sanity check that "/home/ctf" is nosuid
 
         def simple_tar(path, name=None):
             f = tempfile.NamedTemporaryFile()

@@ -1,8 +1,6 @@
 <label>
 	Cheater Flag<br>
-	<small>Enter cheater flag secret</small>
+	<small>The flag is unique for each user, but also accepts other users' flags</small>
 </label>
-<div class="form-group">
-	<input type="text" class="form-control" name="content" value="{{ content }}">
-</div>
+<input type="hidden" class="form-control" name="content" value="{{ content }}">
 <input type="hidden" name="type" value="cheater">

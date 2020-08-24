@@ -26,7 +26,9 @@ def load(app):
 
     db.create_all()
 
-    register_plugin_assets_directory(app, base_path="/plugins/pwncollege/assets/")
+    register_plugin_assets_directory(
+        app, base_path="/plugins/CTFd-pwn-college-plugin/assets/"
+    )
 
     CHALLENGE_CLASSES["docker"] = DockerChallenge
 
@@ -36,7 +38,6 @@ def load(app):
     key_template_path = os.path.join(dir_path, "assets", "key", "settings.html")
     override_template("settings.html", open(key_template_path).read())
     app.view_functions["views.settings"] = key_settings
-    register_script("plugins/pwncollege/assets/key/settings.js")
     Forms.keys = {"KeyForm": KeyForm}
 
     blueprint = Blueprint("pwncollege_api", __name__)

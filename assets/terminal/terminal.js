@@ -1,4 +1,7 @@
 $(function () {
+    if (window.location.pathname != "/terminal")
+        return;
+
     var terminal = new window.Terminal();
     terminal.open($('#terminal')[0]);
 

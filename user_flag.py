@@ -12,8 +12,8 @@ from .utils import user_flag
 class UserFlag(BaseFlag):
     name = "user"
     templates = {  # Nunjucks templates used for key editing & viewing
-        "create": "/plugins/pwncollege/assets/user_flag/create.html",
-        "update": "/plugins/pwncollege/assets/user_flag/edit.html",
+        "create": "/plugins/CTFd-pwn-college-plugin/assets/user_flag/create.html",
+        "update": "/plugins/CTFd-pwn-college-plugin/assets/user_flag/edit.html",
     }
 
     @staticmethod
@@ -22,8 +22,6 @@ class UserFlag(BaseFlag):
         account_id = get_current_user().account_id
 
         correct = user_flag(account_id, challenge_id)
-
-        provided = str(provided)
         provided = re.sub(".+?{(.+)}", r"\1", provided)
 
         return hmac.compare_digest(correct, provided)
@@ -32,8 +30,8 @@ class UserFlag(BaseFlag):
 class CheaterUserFlag(BaseFlag):
     name = "cheater"
     templates = {  # Nunjucks templates used for key editing & viewing
-        "create": "/plugins/pwncollege/assets/cheater_flag/create.html",
-        "update": "/plugins/pwncollege/assets/cheater_flag/edit.html",
+        "create": "/plugins/CTFd-pwn-college-plugin/assets/cheater_flag/create.html",
+        "update": "/plugins/CTFd-pwn-college-plugin/assets/cheater_flag/edit.html",
     }
 
     @staticmethod

@@ -15,7 +15,7 @@ var key_success_template =
 $(function() {
     if (window.location.pathname != "/settings")
         return;
-    
+
     var form = $("#user-key-form");
     form.submit(function(e) {
         e.preventDefault();
@@ -49,7 +49,7 @@ $(function() {
             } else if (response.status === 200) {
                 response.json().then(function(object) {
                     if (object.success) {
-                        $("#key-results").html(success_template);
+                        $("#key-results").html(key_success_template);
                     }
                 });
             }

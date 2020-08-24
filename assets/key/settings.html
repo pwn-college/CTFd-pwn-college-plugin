@@ -124,7 +124,7 @@
 
             <div id="key-results" class="form-group">
             </div>
-            
+
             <div class="form-group text-right">
               {{ form.submit(class="btn btn-md btn-primary btn-outlined") }}
             </div>
@@ -137,9 +137,10 @@
 </div>
 {% endblock %}
 
-{% block scripts %}
-{% endblock %}
-
 {% block entrypoint %}
 <script defer src="{{ url_for('views.themes', path='js/pages/settings.js') }}"></script>
+{% endblock %}
+
+{% block scripts %}
+<script defer src="plugins/CTFd-pwn-college-plugin/assets/key/settings.js"></script>
 {% endblock %}
