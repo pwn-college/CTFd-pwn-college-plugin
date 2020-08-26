@@ -13,7 +13,7 @@ from CTFd.plugins.challenges import CHALLENGE_CLASSES
 from CTFd.plugins.flags import FLAG_CLASSES
 
 from .docker_challenge import DockerChallenge, docker_namespace
-from .user_flag import UserFlag, CheaterUserFlag
+from .user_flag import UserFlag
 from .ssh_key import Keys, KeyForm, key_settings, keys_namespace
 from .download import download, download_namespace
 from .terminal import terminal
@@ -33,7 +33,6 @@ def load(app):
     CHALLENGE_CLASSES["docker"] = DockerChallenge
 
     FLAG_CLASSES["user"] = UserFlag
-    FLAG_CLASSES["cheater"] = CheaterUserFlag
 
     key_template_path = os.path.join(dir_path, "assets", "key", "settings.html")
     override_template("settings.html", open(key_template_path).read())

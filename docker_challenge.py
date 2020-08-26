@@ -1,5 +1,6 @@
 import os
 import sys
+import pathlib
 import tempfile
 import tarfile
 
@@ -24,16 +25,13 @@ from CTFd.plugins.challenges import BaseChallenge
 from CTFd.plugins.flags import get_flag_class
 
 from .settings import INSTANCE, HOST_DATA_PATH
-from .utils import user_flag, challenge_path
+from .utils import serialize_user_flag, challenge_path
 
 
 class DockerChallenges(Challenges):
     __mapper_args__ = {"polymorphic_identity": "docker"}
     id = db.Column(None, db.ForeignKey("challenges.id"), primary_key=True)
     docker_image_name = db.Column(db.String(32))
-
-    def __init__(self, *args, **kwargs):
-        super(DockerChallenges, self).__init__(**kwargs)
 
 
 class DockerChallenge(BaseChallenge):
@@ -87,12 +85,15 @@ class RunDocker(Resource):
         image_name = challenge.docker_image_name
         category = challenge.category
         challenge = challenge.name
-        flag = user_flag(account_id, challenge_id)
-        flag = f"pwn_college{{{flag}}}"
 
-        chall_path = challenge_path(account_id, category, challenge)
-        if not chall_path:
-            return {"success": False, "error": "Challenge data does not exist"}
+        if category == "babysuid":
+            # TODO: make babysuid not so hacked in
+            selected_path = data.get("selected_path")
+
+        else:
+            chall_path = challenge_path(account_id, category, challenge)
+            if not chall_path:
+                return {"success": False, "error": "Challenge data does not exist"}
 
         docker_client = docker.from_env()
 
@@ -106,7 +107,6 @@ class RunDocker(Resource):
             pass
 
         try:
-            # TODO: what if we create the container, and then only start it once its configured...
             container = docker_client.containers.run(
                 image_name,
                 ["/bin/bash", "-c", "while true; do su ctf; done"],
@@ -133,36 +133,70 @@ class RunDocker(Resource):
 
         # TODO: sanity check that "/home/ctf" is nosuid
 
-        def simple_tar(path, name=None):
-            f = tempfile.NamedTemporaryFile()
-            t = tarfile.open(mode="w", fileobj=f)
+        extra_data = None
 
-            abs_path = os.path.abspath(path)
-            t.add(abs_path, arcname=(name or os.path.basename(path)), recursive=False)
+        if category == "babysuid":
+            # TODO: make babysuid not so hacked in
 
-            t.close()
-            f.seek(0)
-            return f
+            # No command injection please
+            selected_path = selected_path.replace("'", "").replace('"', "")
 
-        with simple_tar(chall_path, f"{category}_{challenge}") as tar:
-            container.put_archive("/", tar)
+            exit_code, output = container.exec_run(
+                f"""/bin/sh -c \"
+                test -f '{selected_path}' &&
+                chmod u+s '{selected_path}' &&
+                readlink -e '{selected_path}';
+                \""""
+            )
 
-        container.exec_run(f"chmod 4755 /{category}_{challenge}")
+            if exit_code != 0:
+                container.kill()
+                container.wait(condition="removed")
+                return {"success": False, "error": "Invalid path"}
 
-        if not practice:
-            container.exec_run(f"/bin/sh -c \"echo '{flag}' > /flag\"")
+            selected_path = output.decode("latin").strip()
+
+            suid_path = selected_path
+            extra_data = selected_path
 
         else:
-            container.exec_run("chmod 4755 /usr/bin/sudo")
-            container.exec_run("adduser ctf sudo")
+
+            def simple_tar(path, name=None):
+                f = tempfile.NamedTemporaryFile()
+                t = tarfile.open(mode="w", fileobj=f)
+
+                abs_path = os.path.abspath(path)
+                t.add(
+                    abs_path, arcname=(name or os.path.basename(path)), recursive=False
+                )
+
+                t.close()
+                f.seek(0)
+                return f
+
+            with simple_tar(chall_path, f"{category}_{challenge}") as tar:
+                container.put_archive("/", tar)
+
+            suid_path = f"/{category}_{challenge}"
+
+        container.exec_run(f"chmod 4755 {suid_path}")
+
+        if not practice:
+            flag = serialize_user_flag(account_id, challenge_id, extra_data)
+
+        else:
+            flag = serialize_user_flag(0, 0, 0)
             container.exec_run(
-                "/bin/sh -c \"echo 'ctf ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers\""
+                f"""/bin/sh -c \"
+                chmod 4755 /usr/bin/sudo;
+                adduser ctf sudo;
+                echo 'ctf ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers;
+                echo '127.0.0.1\t{category}_{challenge}' >> /etc/hosts;
+                \""""
             )
-            container.exec_run(
-                f"/bin/sh -c \"echo '127.0.0.1\t{category}_{challenge}' >> /etc/hosts\""
-            )
-            empty_flag = "pwn_college{0000000000000000000000000000000000000000}"
-            container.exec_run(f"/bin/sh -c \"echo '{empty_flag}' > /flag\"")
+
+        flag = f"pwn_college{{{flag}}}"
+        container.exec_run(f"/bin/sh -c \"echo '{flag}' > /flag\"")
 
         return {"success": True, "ssh": f"ssh {INSTANCE}@{INSTANCE}.pwn.college"}
 

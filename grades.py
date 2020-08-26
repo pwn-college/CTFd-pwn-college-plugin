@@ -9,8 +9,7 @@ from CTFd.utils.decorators import authed_only
 
 grades = Blueprint("grades", __name__, template_folder="assets/grades/")
 
-az_timezone = datetime.timezone(datetime.timedelta(hours=-7))
-deadlines = {"babysuid": datetime.datetime(2020, 12, 1, tzinfo=az_timezone)}
+deadlines = {"babysuid": datetime.datetime(2020, 12, 1)}
 
 
 @grades.route("/grades", methods=["GET"])
@@ -70,7 +69,7 @@ def view_grades():
 
         makeup_grades.append(makeup_num_solves / num_available)
 
-    max_time = datetime.datetime.max.replace(tzinfo=az_timezone)
+    max_time = datetime.datetime.max
     grades.sort(key=lambda k: (deadlines.get(k["category"], max_time), k["category"]))
 
     def average(data):
@@ -98,6 +97,6 @@ def view_grades():
     )
 
     for grade in grades:
-        grade["grade"] = f'{grade["grade"]:.2f}%'
+        grade["grade"] = f'{grade["grade"] * 100.0:.2f}%'
 
     return render_template("grades.html", grades=grades)

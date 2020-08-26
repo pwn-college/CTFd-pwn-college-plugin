@@ -107,6 +107,7 @@ class UpdateKey(Resource):
                 existing_key.value = key_value
             db.session.commit()
         except IntegrityError:
+            db.session.rollback()
             return (
                 {"success": False, "errors": {"key": "Public key already in use"}},
                 400,

@@ -40,7 +40,12 @@ function workon(challenge_id, practice=false) {
     var element = practice ? $('#practice > i') : $('#workon > i');
     element.addClass('animate-flicker');
 
-    var params = {'challenge_id': challenge_id, 'practice': practice};
+    var selected_path = $('#selected-path').val() || "";
+    var params = {
+        'challenge_id': challenge_id,
+        'practice': practice,
+        'selected_path': selected_path
+    };
 
     CTFd.fetch('/pwncollege_api/v1/docker', {
         method: 'POST',
