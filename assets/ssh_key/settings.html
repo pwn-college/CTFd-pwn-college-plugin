@@ -114,7 +114,7 @@
           {% endif %}
         </div>
         <div class="tab-pane fade" id="key" role="tabpanel">
-          {% with form = Forms.keys.KeyForm() %}
+          {% with form = Forms.keys.SSHKeyForm() %}
           <form method="POST" id="user-key-form">
             <div class="form-group">
               <b>{{ form.key.label }}</b>
@@ -142,5 +142,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script defer src="plugins/CTFd-pwn-college-plugin/assets/key/settings.js"></script>
+<script defer src="plugins/CTFd-pwn-college-plugin/assets/ssh_key/settings.js"></script>
 {% endblock %}

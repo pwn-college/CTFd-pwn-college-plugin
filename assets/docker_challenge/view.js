@@ -124,3 +124,23 @@ function inspect(challenge_id) {
         result_notification.slideDown();
     });
 }
+
+function render_multi_solved(category) {
+    CTFd.fetch('/pwncollege_api/v1/user_flag/multi_solved/' + category, {
+        method: 'GET',
+        credentials: 'same-origin',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+    }).then(function (response) {
+        return response.json();
+    }).then(function (result) {
+        if (result.success) {
+            $('#multi-solved-body').empty();
+            result.solved.forEach((solved) => {
+                $('#multi-solved-body').append($("<tr>").append($("<td>").text(solved)));
+            });
+        }
+    });
+}

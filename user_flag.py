@@ -1,10 +1,13 @@
 import sys
 import datetime
 
+from flask import request
+from flask_restx import Namespace, Resource
 from sqlalchemy.exc import IntegrityError
 from CTFd.models import db, Challenges
 from CTFd.plugins.flags import BaseFlag, FlagException
 from CTFd.utils.user import get_current_user
+from CTFd.utils.decorators import authed_only
 
 from .utils import unserialize_user_flag, BadSignature
 
@@ -37,8 +40,8 @@ class Cheaters(db.Model):
     )
 
 
-class MultiFlags(db.Model):
-    __tablename__ = "multiflags"
+class MultiSolves(db.Model):
+    __tablename__ = "multi_solves"
     user_id = db.Column(
         db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
@@ -105,13 +108,13 @@ class UserFlag(BaseFlag):
         if option_multi:
             challenge = Challenges.query.filter_by(id=current_challenge_id).first()
 
-            multi_flag = MultiFlags(
+            multi_solve = MultiSolves(
                 user_id=account_id,
                 challenge_category=challenge.category,
                 challenge_data=challenge_data,
             )
             try:
-                db.session.add(multi_flag)
+                db.session.add(multi_solve)
                 db.session.commit()
                 return True
             except IntegrityError:
@@ -119,3 +122,22 @@ class UserFlag(BaseFlag):
                 raise FlagException("You have already submitted this flag!")
 
         return True
+
+
+user_flag_namespace = Namespace(
+    "user_flag", description="Endpoint to manage user flags"
+)
+
+
+@user_flag_namespace.route("/multi_solved/<category>")
+class MultiSolved(Resource):
+    @authed_only
+    def get(self, category):
+        user = get_current_user()
+
+        solves = MultiSolves.query.filter_by(
+            user_id=user.account_id, challenge_category=category
+        )
+        solved = [solve.challenge_data for solve in solves]
+
+        return {"success": True, "solved": solved}

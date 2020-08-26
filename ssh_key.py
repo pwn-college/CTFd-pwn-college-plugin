@@ -14,21 +14,21 @@ from CTFd.utils.helpers import get_infos, markup
 from CTFd.utils.user import get_current_user
 
 
-class Keys(db.Model):
-    __tablename__ = "keys"
+class SSHKeys(db.Model):
+    __tablename__ = "ssh_keys"
     user_id = db.Column(
         db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
     value = db.Column(db.Text, unique=True)
 
 
-class KeyForm(BaseForm):
+class SSHKeyForm(BaseForm):
     key = StringField("SSH Key")
     submit = SubmitField("Update")
 
 
 @authed_only
-def key_settings():
+def ssh_key_settings():
     infos = get_infos()
 
     user = get_current_user()
@@ -40,7 +40,7 @@ def key_settings():
 
     tokens = UserTokens.query.filter_by(user_id=user.id).all()
 
-    key = Keys.query.filter_by(user_id=user.id).first()
+    key = SSHKeys.query.filter_by(user_id=user.id).first()
     key = key.value if key else None
 
     prevent_name_change = get_config("prevent_name_change")
@@ -69,12 +69,12 @@ def key_settings():
     )
 
 
-keys_namespace = Namespace(
+ssh_key_namespace = Namespace(
     "keys", description="Endpoint to manage users' public SSH keys"
 )
 
 
-@keys_namespace.route("")
+@ssh_key_namespace.route("")
 class UpdateKey(Resource):
     @authed_only
     def patch(self):
@@ -99,9 +99,9 @@ class UpdateKey(Resource):
         user = get_current_user()
 
         try:
-            existing_key = Keys.query.filter_by(user_id=user.id).first()
+            existing_key = SSHKeys.query.filter_by(user_id=user.id).first()
             if not existing_key:
-                key = Keys(user_id=user.id, value=key_value)
+                key = SSHKeys(user_id=user.id, value=key_value)
                 db.session.add(key)
             else:
                 existing_key.value = key_value

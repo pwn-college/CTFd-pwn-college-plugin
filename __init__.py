@@ -13,8 +13,8 @@ from CTFd.plugins.challenges import CHALLENGE_CLASSES
 from CTFd.plugins.flags import FLAG_CLASSES
 
 from .docker_challenge import DockerChallenge, docker_namespace
-from .user_flag import UserFlag
-from .ssh_key import Keys, KeyForm, key_settings, keys_namespace
+from .user_flag import UserFlag, user_flag_namespace
+from .ssh_key import SSHKeys, SSHKeyForm, ssh_key_settings, ssh_key_namespace
 from .download import download, download_namespace
 from .terminal import terminal
 from .binary_ninja import binary_ninja_namespace
@@ -34,15 +34,16 @@ def load(app):
 
     FLAG_CLASSES["user"] = UserFlag
 
-    key_template_path = os.path.join(dir_path, "assets", "key", "settings.html")
-    override_template("settings.html", open(key_template_path).read())
-    app.view_functions["views.settings"] = key_settings
-    Forms.keys = {"KeyForm": KeyForm}
+    ssh_key_template_path = os.path.join(dir_path, "assets", "ssh_key", "settings.html")
+    override_template("settings.html", open(ssh_key_template_path).read())
+    app.view_functions["views.settings"] = ssh_key_settings
+    Forms.keys = {"SSHKeyForm": SSHKeyForm}
 
     blueprint = Blueprint("pwncollege_api", __name__)
     api = Api(blueprint, version="v1", doc=current_app.config.get("SWAGGER_UI"))
-    api.add_namespace(keys_namespace, "/key")
     api.add_namespace(docker_namespace, "/docker")
+    api.add_namespace(user_flag_namespace, "/user_flag")
+    api.add_namespace(ssh_key_namespace, "/ssh_key")
     api.add_namespace(download_namespace, "/download")
     api.add_namespace(binary_ninja_namespace, "/binary_ninja")
     app.register_blueprint(blueprint, url_prefix="/pwncollege_api/v1")

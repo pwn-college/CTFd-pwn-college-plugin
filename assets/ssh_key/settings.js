@@ -13,16 +13,13 @@ var key_success_template =
     "</div>";
 
 $(function() {
-    if (window.location.pathname != "/settings")
-        return;
-
     var form = $("#user-key-form");
     form.submit(function(e) {
         e.preventDefault();
         $("#key-results").empty();
         var params = $("#user-key-form").serializeJSON();
 
-        CTFd.fetch("/pwncollege_api/v1/key", {
+        CTFd.fetch("/pwncollege_api/v1/ssh_key", {
             method: "PATCH",
             credentials: "same-origin",
             headers: {

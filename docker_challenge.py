@@ -5,7 +5,7 @@ import tempfile
 import tarfile
 
 import docker
-
+import requests
 from flask import request, Blueprint
 from flask_restx import Namespace, Resource
 from CTFd.models import (
@@ -93,6 +93,11 @@ class RunDocker(Resource):
         else:
             chall_path = challenge_path(account_id, category, challenge)
             if not chall_path:
+                print(
+                    f"Challenge data does not exist: {account_id}, {category}, {challenge}",
+                    file=sys.stderr,
+                    flush=True,
+                )
                 return {"success": False, "error": "Challenge data does not exist"}
 
         docker_client = docker.from_env()
@@ -106,6 +111,20 @@ class RunDocker(Resource):
         except docker.errors.NotFound:
             pass
 
+        # try:
+        #     response = requests.post(f"http://home_daemon/init/{user.id}").json()
+        #     if not response["success"]:
+        #         error = response["error"]
+        #         print(
+        #             f"Home daemon failed to init home for user {user.id}: {error}",
+        #             file=sys.stderr,
+        #             flush=True,
+        #         )
+        #         return {"success": False, "error": "Home daemon failed to init home"}
+        # except Exception as e:
+        #     print(f"Failed to reach home daemon: {e}", file=sys.stderr, flush=True)
+        #     return {"success": False, "error": "Failed to reach home daemon"}
+
         try:
             container = docker_client.containers.run(
                 image_name,
@@ -115,7 +134,10 @@ class RunDocker(Resource):
                 environment={"CHALLENGE_ID": str(challenge_id)},
                 mounts=[
                     docker.types.Mount(
-                        "/home/ctf", f"{HOST_DATA_PATH}/home-nosuid/{user.id}", "bind"
+                        "/home/ctf",
+                        f"{HOST_DATA_PATH}/homes/nosuid/{user.id}",
+                        "bind",
+                        propagation="shared",
                     )
                 ],
                 network="none",
@@ -128,10 +150,31 @@ class RunDocker(Resource):
                 remove=True,
             )
         except Exception as e:
-            print(f"Docker failed: {e}", file=sys.stderr)
+            print(f"Docker failed: {e}", file=sys.stderr, flush=True)
             return {"success": False, "error": "Docker failed"}
 
-        # TODO: sanity check that "/home/ctf" is nosuid
+        exit_code, output = container.exec_run("findmnt --output OPTIONS /home/ctf")
+        if exit_code != 0:
+            container.kill()
+            container.wait(condition="removed")
+            print(
+                f"Home directory failed to mount for user {user.id}",
+                file=sys.stderr,
+                flush=True,
+            )
+            return {"success": False, "error": "Home directory failed to mount"}
+        elif b"nosuid" not in output:
+            container.kill()
+            container.wait(condition="removed")
+            print(
+                f"Home directory failed to mount as nosuid for user {user.id}",
+                file=sys.stderr,
+                flush=True,
+            )
+            return {
+                "success": False,
+                "error": "Home directory failed to mount as nosuid",
+            }
 
         extra_data = None
 

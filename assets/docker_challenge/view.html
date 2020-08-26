@@ -3,14 +3,6 @@
 {% block description %}
 {{ challenge.html }}
 
-{% if challenge.category == 'babysuid' %}
-<div class="row">
-  <div class="col-md-12 form-group">
-    <input id="selected-path" class="form-control" type="text" placeholder="Path to selected binary"/>
-  </div>
-</div>
-{% endif %}
-
 <style>
   @keyframes flickerAnimation {
   0%   { opacity:1; }
@@ -43,8 +35,30 @@
 <script>
   $(function () {
   $('[data-toggle="tooltip"]').tooltip();
+  render_multi_solved("{{ challenge.category }}");
   });
 </script>
+
+{% if challenge.category == 'babysuid' %}
+<br>
+<label>
+  <b>You have already solved:</b><br>
+</label>
+<div id="multi-solved" class="row overflow-auto" style="max-height: 250px">
+  <div class="col-md-12">
+    <table class="table table-striped">
+      <tbody id="multi-solved-body">
+      </tbody>
+    </table>
+  </div>
+</div>
+<br>
+<div class="row">
+  <div class="col-md-12 form-group">
+    <input id="selected-path" class="form-control" type="text" placeholder="Path to selected binary"/>
+  </div>
+</div>
+{% endif %}
 
 <div class="row">
   <div class="col-sm-3 form-group text-center">
