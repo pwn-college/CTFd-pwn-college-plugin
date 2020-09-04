@@ -15,6 +15,7 @@ from CTFd.plugins.flags import FLAG_CLASSES
 from .docker_challenge import DockerChallenge, docker_namespace
 from .user_flag import UserFlag, user_flag_namespace
 from .ssh_key import SSHKeys, SSHKeyForm, ssh_key_settings, ssh_key_namespace
+from .scoreboard import scoreboard_listing
 from .download import download, download_namespace
 from .terminal import terminal
 from .binary_ninja import binary_ninja_namespace
@@ -38,6 +39,12 @@ def load(app):
     override_template("settings.html", open(ssh_key_template_path).read())
     app.view_functions["views.settings"] = ssh_key_settings
     Forms.keys = {"SSHKeyForm": SSHKeyForm}
+
+    scoreboard_template_path = os.path.join(
+        dir_path, "assets", "scoreboard", "scoreboard.html"
+    )
+    override_template("scoreboard.html", open(scoreboard_template_path).read())
+    app.view_functions["scoreboard.listing"] = scoreboard_listing
 
     blueprint = Blueprint("pwncollege_api", __name__)
     api = Api(blueprint, version="v1", doc=current_app.config.get("SWAGGER_UI"))

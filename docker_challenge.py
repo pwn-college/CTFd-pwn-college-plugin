@@ -222,7 +222,13 @@ class RunDocker(Resource):
 
             suid_path = f"/{category}_{challenge}"
 
-        container.exec_run(f"chmod 4755 {suid_path}")
+        container.exec_run(
+            f"""/bin/sh -c \"
+            chmod 4755 {suid_path};
+            touch /flag;
+            chmod 400 /flag;
+            \""""
+        )
 
         if not practice:
             flag = serialize_user_flag(account_id, challenge_id, extra_data)
