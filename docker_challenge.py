@@ -86,6 +86,13 @@ class RunDocker(Resource):
         except docker.errors.NotFound:
             pass
 
+    def kill_container(self, container):
+        try:
+            container.kill()
+            container.wait(condition="removed")
+        except docker.errors.NotFound:
+            pass
+
     def init_user_container(self, user, challenge):
         docker_client = docker.from_env()
         image_name = challenge.docker_image_name
@@ -127,8 +134,7 @@ class RunDocker(Resource):
         """ make sure /home/ctf is mounted and mounted as nosuid """
         exit_code, output = container.exec_run("findmnt --output OPTIONS /home/ctf")
         if exit_code != 0:
-            container.kill()
-            container.wait(condition="removed")
+            self.kill_container(container)
             print(
                 f"Home directory failed to mount for user {user.id}",
                 file=sys.stderr,
@@ -136,8 +142,7 @@ class RunDocker(Resource):
             )
             return "Home directory failed to mount"
         elif b"nosuid" not in output:
-            container.kill()
-            container.wait(condition="removed")
+            self.kill_container(container)
             print(
                 f"Home directory failed to mount as nosuid for user {user.id}",
                 file=sys.stderr,
