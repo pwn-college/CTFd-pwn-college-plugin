@@ -186,6 +186,7 @@ class RunDocker(Resource):
 
         container.exec_run(
             f"""/bin/sh -c \"
+            chown root:root {suid_path};
             chmod 4755 {suid_path};
             touch /flag;
             chmod 400 /flag;
