@@ -64,7 +64,7 @@ docker_namespace = Namespace(
 @docker_namespace.route("")
 class RunDocker(Resource):
 
-    def get_challenge(self, challenge_id):
+    def get_challenge(self, user, challenge_id):
         try:
             challenge_id = int(challenge_id)
         except (ValueError, TypeError):
@@ -73,6 +73,15 @@ class RunDocker(Resource):
         challenge = DockerChallenges.query.filter_by(id=challenge_id).first()
         if not challenge:
             return None, "Invalid challenge"
+
+        chall_path = challenge_path(user.id, category, challenge.name)
+        if not chall_path:
+            print(
+                f"Challenge data does not exist: {user.id}, {challenge.category}, {challenge.name}",
+                file=sys.stderr,
+                flush=True,
+            )
+            return None, "Challenge data does not exist"
 
         return challenge, None
 
@@ -204,29 +213,12 @@ class RunDocker(Resource):
         data = request.get_json()
         challenge_id = data.get("challenge_id")
         practice = data.get("practice")
-
-        challenge, error_msg = self.get_challenge(challenge_id)
-        if error_msg or not challenge:
-            return {"success": False, "error": error_msg}
-
         user = get_current_user()
         account_id = user.account_id
-        category = challenge.category
-        challenge_name = challenge.name
 
-        if category == "babysuid":
-            # TODO: make babysuid not so hacked in
-            selected_path = data.get("selected_path")
-
-        else:
-            chall_path = challenge_path(account_id, category, challenge_name)
-            if not chall_path:
-                print(
-                    f"Challenge data does not exist: {account_id}, {category}, {challenge_name}",
-                    file=sys.stderr,
-                    flush=True,
-                )
-                return {"success": False, "error": "Challenge data does not exist"}
+        challenge, error_msg = self.get_challenge(user, challenge_id)
+        if error_msg or not challenge:
+            return {"success": False, "error": error_msg}
 
         # kill existing user container and restart a new one based on the challenge
         self.kill_user_container(user)
@@ -254,8 +246,10 @@ class RunDocker(Resource):
 
         extra_data = None
 
-        if category == "babysuid":
+        # inject suid binary or make a binary suid in a hacky way
+        if challenge.category == "babysuid":
             # TODO: make babysuid not so hacked in
+            selected_path = data.get("selected_path")
 
             # No command injection please
             selected_path = selected_path.replace("'", "").replace('"', "")
@@ -269,13 +263,11 @@ class RunDocker(Resource):
             )
 
             if exit_code != 0:
-                container.kill()
-                container.wait(condition="removed")
+                self.kill_container(container)
                 return {"success": False, "error": "Invalid path"}
 
             selected_path = output.decode("latin").strip()
 
-            suid_path = selected_path
             extra_data = selected_path
 
         else:
