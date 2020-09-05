@@ -24,7 +24,7 @@ from CTFd.utils.uploads import delete_file
 from CTFd.plugins.challenges import BaseChallenge
 from CTFd.plugins.flags import get_flag_class
 
-from .settings import INSTANCE, HOST_DATA_PATH
+from .settings import INSTANCE, HOST_DATA_PATH, VIRTUAL_HOST
 from .utils import serialize_user_flag, challenge_path
 
 
@@ -275,7 +275,7 @@ class RunDocker(Resource):
         #flag = f"pwn_college{{{flag}}}"
         #container.exec_run(f"/bin/sh -c \"echo '{flag}' > /flag\"")
 
-        return {"success": True, "ssh": f"ssh {INSTANCE}@{INSTANCE}.pwn.college"}
+        return {"success": True, "ssh": f"ssh {INSTANCE}@{VIRTUAL_HOST}"}
 
     @authed_only
     def get(self):
