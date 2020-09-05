@@ -123,13 +123,36 @@ class RunDocker(Resource):
             print(f"Docker failed: {e}", file=sys.stderr, flush=True)
             return None
 
+    def check_mount(self, user, container):
+        """ make sure /home/ctf is mounted and mounted as nosuid """
+        exit_code, output = container.exec_run("findmnt --output OPTIONS /home/ctf")
+        if exit_code != 0:
+            container.kill()
+            container.wait(condition="removed")
+            print(
+                f"Home directory failed to mount for user {user.id}",
+                file=sys.stderr,
+                flush=True,
+            )
+            return "Home directory failed to mount"
+        elif b"nosuid" not in output:
+            container.kill()
+            container.wait(condition="removed")
+            print(
+                f"Home directory failed to mount as nosuid for user {user.id}",
+                file=sys.stderr,
+                flush=True,
+            )
+            return "Home directory failed to mount as nosuid"
+        return None
+
     @authed_only
     def post(self):
         data = request.get_json()
         challenge_id = data.get("challenge_id")
         practice = data.get("practice")
 
-        challenge, error_msg = self.get_chalelnge()
+        challenge, error_msg = self.get_challenge(challenge_id)
         if error_msg or not challenge:
             return {"success": False, "error": error_msg}
 
@@ -172,29 +195,9 @@ class RunDocker(Resource):
         #     print(f"Failed to reach home daemon: {e}", file=sys.stderr, flush=True)
         #     return {"success": False, "error": "Failed to reach home daemon"}
 
-
-        #exit_code, output = container.exec_run("findmnt --output OPTIONS /home/ctf")
-        #if exit_code != 0:
-        #    container.kill()
-        #    container.wait(condition="removed")
-        #    print(
-        #        f"Home directory failed to mount for user {user.id}",
-        #        file=sys.stderr,
-        #        flush=True,
-        #    )
-        #    return {"success": False, "error": "Home directory failed to mount"}
-        #elif b"nosuid" not in output:
-        #    container.kill()
-        #    container.wait(condition="removed")
-        #    print(
-        #        f"Home directory failed to mount as nosuid for user {user.id}",
-        #        file=sys.stderr,
-        #        flush=True,
-        #    )
-        #    return {
-        #        "success": False,
-        #        "error": "Home directory failed to mount as nosuid",
-        #    }
+        error_msg = self.check_mount(user, container)
+        if error_msg:
+            return {"success": False, "error": error_msg}
 
         #extra_data = None
 
