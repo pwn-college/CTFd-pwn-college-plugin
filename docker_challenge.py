@@ -252,22 +252,25 @@ class RunDocker(Resource):
     @authed_only
     def get(self):
         user = get_current_user()
-
         docker_client = docker.from_env()
-
         container_name = f"{INSTANCE}_user_{user.id}"
 
+        # get container by name
         try:
             container = docker_client.containers.get(container_name)
         except docker.errors.NotFound:
             return {"success": False, "error": "No container"}
 
+        # make sure the container has CHALLENGE_ID environment variable
         for env in container.attrs["Config"]["Env"]:
             if env.startswith("CHALLENGE_ID"):
-                try:
-                    challenge_id = int(env[len("CHALLENGE_ID=") :])
-                    return {"success": True, "challenge_id": challenge_id}
-                except ValueError:
-                    return {"success": False, "error": "Invalid challenge id"}
+                break
         else:
             return {"success": False, "error": "No challenge id"}
+
+        # make sure the variable is a valid CHALLENGE_ID
+        try:
+            challenge_id = int(env[len("CHALLENGE_ID=") :])
+            return {"success": True, "challenge_id": challenge_id}
+        except ValueError:
+            return {"success": False, "error": "Invalid challenge id"}
