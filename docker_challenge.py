@@ -63,47 +63,22 @@ docker_namespace = Namespace(
 
 @docker_namespace.route("")
 class RunDocker(Resource):
-    @authed_only
-    def post(self):
-        data = request.get_json()
-        challenge_id = data.get("challenge_id")
-        practice = data.get("practice")
 
+    def get_challenge(self, challenge_id):
         try:
             challenge_id = int(challenge_id)
         except (ValueError, TypeError):
-            return {"success": False, "error": "Invalid challenge id"}
+            return None, "Invalid challenge id"
 
         challenge = DockerChallenges.query.filter_by(id=challenge_id).first()
-
         if not challenge:
-            return {"success": False, "error": "Invalid challenge"}
+            return None, "Invalid challenge"
 
-        user = get_current_user()
-        account_id = user.account_id
+        return challenge, None
 
-        image_name = challenge.docker_image_name
-        category = challenge.category
-        challenge = challenge.name
-
-        if category == "babysuid":
-            # TODO: make babysuid not so hacked in
-            selected_path = data.get("selected_path")
-
-        else:
-            chall_path = challenge_path(account_id, category, challenge)
-            if not chall_path:
-                print(
-                    f"Challenge data does not exist: {account_id}, {category}, {challenge}",
-                    file=sys.stderr,
-                    flush=True,
-                )
-                return {"success": False, "error": "Challenge data does not exist"}
-
+    def kill_user_container(self, user):
         docker_client = docker.from_env()
-
         container_name = f"{INSTANCE}_user_{user.id}"
-
         try:
             container = docker_client.containers.get(container_name)
             container.kill()
@@ -111,26 +86,20 @@ class RunDocker(Resource):
         except docker.errors.NotFound:
             pass
 
-        # try:
-        #     response = requests.post(f"http://home_daemon/init/{user.id}").json()
-        #     if not response["success"]:
-        #         error = response["error"]
-        #         print(
-        #             f"Home daemon failed to init home for user {user.id}: {error}",
-        #             file=sys.stderr,
-        #             flush=True,
-        #         )
-        #         return {"success": False, "error": "Home daemon failed to init home"}
-        # except Exception as e:
-        #     print(f"Failed to reach home daemon: {e}", file=sys.stderr, flush=True)
-        #     return {"success": False, "error": "Failed to reach home daemon"}
+    def init_user_container(self, user, challenge):
+        docker_client = docker.from_env()
+        image_name = challenge.docker_image_name
+        category = challenge.category
+        challenge_id = challenge.id
+        challenge_name = challenge.name
+        container_name = f"{INSTANCE}_user_{user.id}"
 
         try:
             container = docker_client.containers.run(
                 image_name,
                 ["/bin/bash", "-c", "while true; do su ctf; done"],
                 name=container_name,
-                hostname=f"{category}_{challenge}",
+                hostname=f"{category}_{challenge_name}",
                 environment={"CHALLENGE_ID": str(challenge_id)},
                 mounts=[
                     docker.types.Mount(
@@ -149,103 +118,154 @@ class RunDocker(Resource):
                 stdin_open=True,
                 remove=True,
             )
+            return container
         except Exception as e:
             print(f"Docker failed: {e}", file=sys.stderr, flush=True)
-            return {"success": False, "error": "Docker failed"}
+            return None
 
-        exit_code, output = container.exec_run("findmnt --output OPTIONS /home/ctf")
-        if exit_code != 0:
-            container.kill()
-            container.wait(condition="removed")
-            print(
-                f"Home directory failed to mount for user {user.id}",
-                file=sys.stderr,
-                flush=True,
-            )
-            return {"success": False, "error": "Home directory failed to mount"}
-        elif b"nosuid" not in output:
-            container.kill()
-            container.wait(condition="removed")
-            print(
-                f"Home directory failed to mount as nosuid for user {user.id}",
-                file=sys.stderr,
-                flush=True,
-            )
-            return {
-                "success": False,
-                "error": "Home directory failed to mount as nosuid",
-            }
+    @authed_only
+    def post(self):
+        data = request.get_json()
+        challenge_id = data.get("challenge_id")
+        practice = data.get("practice")
 
-        extra_data = None
+        challenge, error_msg = self.get_chalelnge()
+        if error_msg or not challenge:
+            return {"success": False, "error": error_msg}
+
+        user = get_current_user()
+        account_id = user.account_id
+        category = challenge.category
+        challenge_name = challenge.name
 
         if category == "babysuid":
             # TODO: make babysuid not so hacked in
-
-            # No command injection please
-            selected_path = selected_path.replace("'", "").replace('"', "")
-
-            exit_code, output = container.exec_run(
-                f"""/bin/sh -c \"
-                test -f '{selected_path}' &&
-                chmod u+s '{selected_path}' &&
-                readlink -e '{selected_path}';
-                \""""
-            )
-
-            if exit_code != 0:
-                container.kill()
-                container.wait(condition="removed")
-                return {"success": False, "error": "Invalid path"}
-
-            selected_path = output.decode("latin").strip()
-
-            suid_path = selected_path
-            extra_data = selected_path
+            selected_path = data.get("selected_path")
 
         else:
-
-            def simple_tar(path, name=None):
-                f = tempfile.NamedTemporaryFile()
-                t = tarfile.open(mode="w", fileobj=f)
-
-                abs_path = os.path.abspath(path)
-                t.add(
-                    abs_path, arcname=(name or os.path.basename(path)), recursive=False
+            chall_path = challenge_path(account_id, category, challenge_name)
+            if not chall_path:
+                print(
+                    f"Challenge data does not exist: {account_id}, {category}, {challenge_name}",
+                    file=sys.stderr,
+                    flush=True,
                 )
+                return {"success": False, "error": "Challenge data does not exist"}
 
-                t.close()
-                f.seek(0)
-                return f
+        # kill existing user container and restart a new one based on the challenge
+        self.kill_user_container(user)
+        container = self.init_user_container(user, challenge)
+        if not container:
+            return {"success": False, "error": "Docker failed"}
 
-            with simple_tar(chall_path, f"{category}_{challenge}") as tar:
-                container.put_archive("/", tar)
+        # try:
+        #     response = requests.post(f"http://home_daemon/init/{user.id}").json()
+        #     if not response["success"]:
+        #         error = response["error"]
+        #         print(
+        #             f"Home daemon failed to init home for user {user.id}: {error}",
+        #             file=sys.stderr,
+        #             flush=True,
+        #         )
+        #         return {"success": False, "error": "Home daemon failed to init home"}
+        # except Exception as e:
+        #     print(f"Failed to reach home daemon: {e}", file=sys.stderr, flush=True)
+        #     return {"success": False, "error": "Failed to reach home daemon"}
 
-            suid_path = f"/{category}_{challenge}"
 
-        container.exec_run(
-            f"""/bin/sh -c \"
-            chmod 4755 {suid_path};
-            touch /flag;
-            chmod 400 /flag;
-            \""""
-        )
+        #exit_code, output = container.exec_run("findmnt --output OPTIONS /home/ctf")
+        #if exit_code != 0:
+        #    container.kill()
+        #    container.wait(condition="removed")
+        #    print(
+        #        f"Home directory failed to mount for user {user.id}",
+        #        file=sys.stderr,
+        #        flush=True,
+        #    )
+        #    return {"success": False, "error": "Home directory failed to mount"}
+        #elif b"nosuid" not in output:
+        #    container.kill()
+        #    container.wait(condition="removed")
+        #    print(
+        #        f"Home directory failed to mount as nosuid for user {user.id}",
+        #        file=sys.stderr,
+        #        flush=True,
+        #    )
+        #    return {
+        #        "success": False,
+        #        "error": "Home directory failed to mount as nosuid",
+        #    }
 
-        if not practice:
-            flag = serialize_user_flag(account_id, challenge_id, extra_data)
+        #extra_data = None
 
-        else:
-            flag = serialize_user_flag(0, 0, 0)
-            container.exec_run(
-                f"""/bin/sh -c \"
-                chmod 4755 /usr/bin/sudo;
-                adduser ctf sudo;
-                echo 'ctf ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers;
-                echo '127.0.0.1\t{category}_{challenge}' >> /etc/hosts;
-                \""""
-            )
+        #if category == "babysuid":
+        #    # TODO: make babysuid not so hacked in
 
-        flag = f"pwn_college{{{flag}}}"
-        container.exec_run(f"/bin/sh -c \"echo '{flag}' > /flag\"")
+        #    # No command injection please
+        #    selected_path = selected_path.replace("'", "").replace('"', "")
+
+        #    exit_code, output = container.exec_run(
+        #        f"""/bin/sh -c \"
+        #        test -f '{selected_path}' &&
+        #        chmod u+s '{selected_path}' &&
+        #        readlink -e '{selected_path}';
+        #        \""""
+        #    )
+
+        #    if exit_code != 0:
+        #        container.kill()
+        #        container.wait(condition="removed")
+        #        return {"success": False, "error": "Invalid path"}
+
+        #    selected_path = output.decode("latin").strip()
+
+        #    suid_path = selected_path
+        #    extra_data = selected_path
+
+        #else:
+
+        #    def simple_tar(path, name=None):
+        #        f = tempfile.NamedTemporaryFile()
+        #        t = tarfile.open(mode="w", fileobj=f)
+
+        #        abs_path = os.path.abspath(path)
+        #        t.add(
+        #            abs_path, arcname=(name or os.path.basename(path)), recursive=False
+        #        )
+
+        #        t.close()
+        #        f.seek(0)
+        #        return f
+
+        #    with simple_tar(chall_path, f"{category}_{challenge_name}") as tar:
+        #        container.put_archive("/", tar)
+
+        #    suid_path = f"/{category}_{challenge_name}"
+
+        #container.exec_run(
+        #    f"""/bin/sh -c \"
+        #    chmod 4755 {suid_path};
+        #    touch /flag;
+        #    chmod 400 /flag;
+        #    \""""
+        #)
+
+        #if not practice:
+        #    flag = serialize_user_flag(account_id, challenge_id, extra_data)
+
+        #else:
+        #    flag = serialize_user_flag(0, 0, 0)
+        #    container.exec_run(
+        #        f"""/bin/sh -c \"
+        #        chmod 4755 /usr/bin/sudo;
+        #        adduser ctf sudo;
+        #        echo 'ctf ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers;
+        #        echo '127.0.0.1\t{category}_{challenge}' >> /etc/hosts;
+        #        \""""
+        #    )
+
+        #flag = f"pwn_college{{{flag}}}"
+        #container.exec_run(f"/bin/sh -c \"echo '{flag}' > /flag\"")
 
         return {"success": True, "ssh": f"ssh {INSTANCE}@{INSTANCE}.pwn.college"}
 
