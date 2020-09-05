@@ -151,6 +151,54 @@ class RunDocker(Resource):
             return "Home directory failed to mount as nosuid"
         return None
 
+    def inject_suid(self, user, container, challenge):
+        challenge_name = challenge.name
+        category = challenge.category
+        account_id = user.account_id
+
+        chall_path = challenge_path(account_id, category, challenge_name)
+        def simple_tar(path, name=None):
+            f = tempfile.NamedTemporaryFile()
+            t = tarfile.open(mode="w", fileobj=f)
+
+            abs_path = os.path.abspath(path)
+            t.add(
+                abs_path, arcname=(name or os.path.basename(path)), recursive=False
+            )
+
+            t.close()
+            f.seek(0)
+            return f
+
+        with simple_tar(chall_path, f"{category}_{challenge_name}") as tar:
+            container.put_archive("/", tar)
+
+        suid_path = f"/{category}_{challenge_name}"
+
+        container.exec_run(
+            f"""/bin/sh -c \"
+            chmod 4755 {suid_path};
+            touch /flag;
+            chmod 400 /flag;
+            \""""
+        )
+
+    def enable_sudo(self, container, challenge):
+        category = challenge.category
+        challenge_name = challenge.name
+        container.exec_run(
+            f"""/bin/sh -c \"
+            chmod 4755 /usr/bin/sudo;
+            adduser ctf sudo;
+            echo 'ctf ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers;
+            echo '127.0.0.1\t{category}_{challenge_name}' >> /etc/hosts;
+            \""""
+        )
+
+    def inject_flag(self, container, flag):
+        flag = f"pwn_college{{{flag}}}"
+        container.exec_run(f"/bin/sh -c \"echo '{flag}' > /flag\"")
+
     @authed_only
     def post(self):
         data = request.get_json()
@@ -204,76 +252,44 @@ class RunDocker(Resource):
         if error_msg:
             return {"success": False, "error": error_msg}
 
-        #extra_data = None
+        extra_data = None
 
-        #if category == "babysuid":
-        #    # TODO: make babysuid not so hacked in
+        if category == "babysuid":
+            # TODO: make babysuid not so hacked in
 
-        #    # No command injection please
-        #    selected_path = selected_path.replace("'", "").replace('"', "")
+            # No command injection please
+            selected_path = selected_path.replace("'", "").replace('"', "")
 
-        #    exit_code, output = container.exec_run(
-        #        f"""/bin/sh -c \"
-        #        test -f '{selected_path}' &&
-        #        chmod u+s '{selected_path}' &&
-        #        readlink -e '{selected_path}';
-        #        \""""
-        #    )
+            exit_code, output = container.exec_run(
+                f"""/bin/sh -c \"
+                test -f '{selected_path}' &&
+                chmod u+s '{selected_path}' &&
+                readlink -e '{selected_path}';
+                \""""
+            )
 
-        #    if exit_code != 0:
-        #        container.kill()
-        #        container.wait(condition="removed")
-        #        return {"success": False, "error": "Invalid path"}
+            if exit_code != 0:
+                container.kill()
+                container.wait(condition="removed")
+                return {"success": False, "error": "Invalid path"}
 
-        #    selected_path = output.decode("latin").strip()
+            selected_path = output.decode("latin").strip()
 
-        #    suid_path = selected_path
-        #    extra_data = selected_path
+            suid_path = selected_path
+            extra_data = selected_path
 
-        #else:
+        else:
+            self.inject_suid(user, container, challenge)
 
-        #    def simple_tar(path, name=None):
-        #        f = tempfile.NamedTemporaryFile()
-        #        t = tarfile.open(mode="w", fileobj=f)
+        # prepare flag string
+        if not practice:
+            flag = serialize_user_flag(account_id, challenge_id, extra_data)
+        else:
+            self.enable_sudo(container, challenge)
+            flag = serialize_user_flag(0, 0, 0)
 
-        #        abs_path = os.path.abspath(path)
-        #        t.add(
-        #            abs_path, arcname=(name or os.path.basename(path)), recursive=False
-        #        )
-
-        #        t.close()
-        #        f.seek(0)
-        #        return f
-
-        #    with simple_tar(chall_path, f"{category}_{challenge_name}") as tar:
-        #        container.put_archive("/", tar)
-
-        #    suid_path = f"/{category}_{challenge_name}"
-
-        #container.exec_run(
-        #    f"""/bin/sh -c \"
-        #    chmod 4755 {suid_path};
-        #    touch /flag;
-        #    chmod 400 /flag;
-        #    \""""
-        #)
-
-        #if not practice:
-        #    flag = serialize_user_flag(account_id, challenge_id, extra_data)
-
-        #else:
-        #    flag = serialize_user_flag(0, 0, 0)
-        #    container.exec_run(
-        #        f"""/bin/sh -c \"
-        #        chmod 4755 /usr/bin/sudo;
-        #        adduser ctf sudo;
-        #        echo 'ctf ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers;
-        #        echo '127.0.0.1\t{category}_{challenge}' >> /etc/hosts;
-        #        \""""
-        #    )
-
-        #flag = f"pwn_college{{{flag}}}"
-        #container.exec_run(f"/bin/sh -c \"echo '{flag}' > /flag\"")
+        # inject it into container
+        self.inject_flag(container, flag)
 
         return {"success": True, "ssh": f"ssh {INSTANCE}@{VIRTUAL_HOST}"}
 
