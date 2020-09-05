@@ -74,7 +74,7 @@ class RunDocker(Resource):
         if not challenge:
             return None, "Invalid challenge"
 
-        chall_path = challenge_path(user.id, category, challenge.name)
+        chall_path = challenge_path(user.id, challenge.category, challenge.name)
         if not chall_path:
             print(
                 f"Challenge data does not exist: {user.id}, {challenge.category}, {challenge.name}",
