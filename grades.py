@@ -9,7 +9,10 @@ from CTFd.utils.decorators import authed_only
 
 grades = Blueprint("grades", __name__, template_folder="assets/grades/")
 
-deadlines = {"babysuid": datetime.datetime(2020, 9, 2, 23)}
+deadlines = {
+    "babysuid": datetime.datetime(2020, 9, 2, 23),
+    "babyshell": datetime.datetime(2020, 9, 9, 23),
+}
 
 
 @grades.route("/grades", methods=["GET"])

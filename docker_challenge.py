@@ -138,7 +138,13 @@ class RunDocker(Resource):
                         f"{HOST_DATA_PATH}/homes/nosuid/{user.id}",
                         "bind",
                         propagation="shared",
-                    )
+                    ),
+                    docker.types.Mount(
+                        "/challenges",
+                        f"{HOST_DATA_PATH}/challenges/{user.id}",
+                        "bind",
+                        read_only=True,
+                    ),
                 ],
                 network="none",
                 cap_add=["SYS_PTRACE"],
