@@ -61,30 +61,32 @@
 {% endif %}
 
 <div class="row">
-  <div class="col-sm-3 form-group text-center">
+  <div class="col-sm-4 form-group text-center">
     <button type="submit" id="workon" class="btn btn-md btn-outline-secondary"
             data-toggle="tooltip" title="Run Challenge" onclick="javascript:workon({{ challenge.id }})">
       <i class="fas fa-play fa-2x"></i>
     </button>
   </div>
-  <div class="col-sm-3 form-group text-center">
+  <div class="col-sm-4 form-group text-center">
     <button type="submit" id="practice" class="btn btn-md btn-outline-secondary"
             data-toggle="tooltip" title="Practice Challenge" onclick="javascript:workon({{ challenge.id }}, true)">
       <i class="fas fa-flask fa-2x"></i>
     </button>
   </div>
-  <div class="col-sm-3 form-group text-center">
+  <div class="col-sm-4 form-group text-center">
     <button type="submit" id="download" class="btn btn-md btn-outline-secondary"
             data-toggle="tooltip" title="Download Challenge" onclick="javascript:download({{ challenge.id }})">
       <i class="fas fa-download fa-2x"></i>
     </button>
   </div>
+<!--
   <div class="col-sm-3 form-group text-center">
     <button type="submit" id="inspect" class="btn btn-md btn-outline-secondary"
             data-toggle="tooltip" title="Inspect Challenge" onclick="javascript:inspect({{ challenge.id }})">
       <i class="fas fa-search fa-2x"></i>
     </button>
   </div>
+-->
 </div>
 
 {% endblock %}
