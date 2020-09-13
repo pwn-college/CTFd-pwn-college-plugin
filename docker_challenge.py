@@ -92,14 +92,14 @@ class RunDocker(Resource):
             container = docker_client.containers.get(container_name)
             container.kill()
             container.wait(condition="removed")
-        except docker.errors.NotFound:
+        except (docker.errors.NotFound, docker.errors.APIError):
             pass
 
     def kill_container(self, container):
         try:
             container.kill()
             container.wait(condition="removed")
-        except docker.errors.NotFound:
+        except (docker.errors.NotFound, docker.errors.APIError):
             pass
 
     def init_user_container(self, user, challenge):
