@@ -54,5 +54,5 @@ def challenge_path(account_id, category, challenge):
     ]
 
     for path in paths:
-        if os.path.isfile(path):
+        if os.path.exists(path):
             return path

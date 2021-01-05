@@ -8,7 +8,11 @@ from CTFd.utils import get_config
 from CTFd.utils.decorators import authed_only
 from CTFd.utils.user import get_current_user
 from CTFd.utils.plugins import register_script, override_template
-from CTFd.plugins import register_plugin_assets_directory, register_user_page_menu_bar
+from CTFd.plugins import (
+    register_plugin_assets_directory,
+    register_user_page_menu_bar,
+    register_admin_plugin_menu_bar,
+)
 from CTFd.plugins.challenges import CHALLENGE_CLASSES
 from CTFd.plugins.flags import FLAG_CLASSES
 
@@ -62,3 +66,4 @@ def load(app):
 
     app.register_blueprint(grades)
     register_user_page_menu_bar("Grades", "/grades")
+    register_admin_plugin_menu_bar("Grades", "/grades/all")

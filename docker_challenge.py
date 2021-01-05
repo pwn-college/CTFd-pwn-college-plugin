@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import pathlib
 import tempfile
 import tarfile
@@ -26,6 +27,11 @@ from CTFd.plugins.flags import get_flag_class
 
 from .settings import INSTANCE, HOST_DATA_PATH
 from .utils import serialize_user_flag, challenge_path
+
+
+dir_path = os.path.dirname(os.path.realpath(__file__))
+with open(f"{dir_path}/seccomp.json") as f:
+    SECCOMP = json.dumps(json.load(f))
 
 
 class DockerChallenges(Challenges):
@@ -148,8 +154,9 @@ class RunDocker(Resource):
                 ],
                 network="none",
                 cap_add=["SYS_PTRACE"],
+                security_opt=[f"seccomp={SECCOMP}"],
                 pids_limit=100,
-                mem_limit="500m",
+                mem_limit="1000m",
                 detach=True,
                 tty=True,
                 stdin_open=True,
@@ -215,9 +222,7 @@ class RunDocker(Resource):
                 t = tarfile.open(mode="w", fileobj=f)
 
                 abs_path = os.path.abspath(path)
-                t.add(
-                    abs_path, arcname=(name or os.path.basename(path)), recursive=False
-                )
+                t.add(abs_path, arcname=(name or os.path.basename(path)))
 
                 t.close()
                 f.seek(0)
@@ -230,7 +235,7 @@ class RunDocker(Resource):
 
         container.exec_run(
             f"""/bin/sh -c \"
-            chmod 4755 {suid_path};
+            chmod -R 4755 {suid_path};
             touch /flag;
             chmod 400 /flag;
             \""""

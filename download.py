@@ -1,6 +1,8 @@
 import os
 import base64
 import json
+import io
+import zipfile
 
 from flask import request, Blueprint, abort, send_file
 from flask_restx import Namespace, Resource
@@ -50,8 +52,26 @@ def download_challenge(token):
 
     filename = f"{category}_{challenge}"
 
+    def simple_zip(dir_path):
+        memory_file = io.BytesIO()
+        with zipfile.ZipFile(memory_file, "w") as zf:
+            for path in os.listdir(dir_path):
+                full_path = f"{dir_path}/{path}"
+                if os.path.isfile(full_path):
+                    zf.write(full_path, path)
+        memory_file.seek(0)
+        return memory_file
+
+    if os.path.isfile(chall_path):
+        file_download = chall_path
+    elif os.path.isdir(chall_path):
+        file_download = simple_zip(chall_path)
+        filename += ".zip"
+    else:
+        abort(404)
+
     return send_file(
-        chall_path,
+        file_download,
         mimetype="application/octet-stream",
         as_attachment=True,
         attachment_filename=filename,
